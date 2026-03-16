@@ -20,11 +20,14 @@ button { padding: 12px 15px; margin: 5px; border: none; border-radius: 8px; font
 .delete { background: #555; color: white; }
 .reset { background: #8e44ad; color: white; width: 90%; margin-top: 30px; font-size: 14px;}
 
-.scan-btn { background: #3498db; color: white; width: 90%; font-size: 16px; margin-top: 5px; margin-bottom: 5px;}
+/* 雙按鈕排版 */
+.top-actions { display: flex; width: 90%; margin: 5px auto; gap: 10px; }
+.action-btn { flex: 1; padding: 12px 0; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; }
+.scan-btn { background: #3498db; }
+.direct-nav-btn { background: #2ecc71; }
 
 .card { background: #222; padding: 15px; margin: 15px 5%; border-radius: 10px; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
 
-/* 🌟 修正選單外觀，讓它變回明顯可點擊的下拉選單 */
 .suggest { background: #444; color: white; margin: 5px 5%; padding: 12px; border-radius: 6px; cursor: pointer; text-align: left; border-left: 4px solid #aaa; font-size: 15px;}
 .suggest:active { background: #666; }
 
@@ -39,9 +42,12 @@ img { width: 100%; margin-top: 12px; border-radius: 8px; }
 
 <h1>掃雷助手 🛵</h1>
 
-<input id="search" placeholder="輸入地址或點擊下方拍照掃描" onkeyup="suggest()">
+<input id="search" placeholder="輸入關鍵字 (非雷區請直接按右下導航)" onkeyup="suggest()">
 
-<button class="scan-btn" onclick="document.getElementById('ocrInput').click()">📱 拍接單螢幕：自動掃雷</button>
+<div class="top-actions">
+    <button class="action-btn scan-btn" onclick="document.getElementById('ocrInput').click()">📱 拍螢幕</button>
+    <button class="action-btn direct-nav-btn" onclick="directNav()">🗺️ 直接導航</button>
+</div>
 <input type="file" id="ocrInput" accept="image/*" capture="environment" style="display: none;" onchange="recognizeText(this)">
 
 <div id="ocrStatus">⏳ 正在掃描螢幕文字... (約需 5 秒)</div>
@@ -77,7 +83,6 @@ let data = JSON.parse(localStorage.getItem('deliveryMines'));
 if (!data || data.length === 0) { data = defaultMines; saveDataToPhone(); }
 render();
 
-// 🌟 修正版：完美融合「手動打字關聯搜尋」與「AI 掃描過濾」
 function suggest() {
     let s = document.getElementById("search").value.replace(/\s+/g, '').toLowerCase(); 
     let html = "";
@@ -85,17 +90,15 @@ function suggest() {
     if (s !== "") {
         let count = 0;
         data.forEach(d => {
-            let fullAddress = d.address.replace(/\s+/g, '').toLowerCase(); // 完整地址包含地標
-            let mainAddress = d.address.split(' ')[0].replace(/\s+/g, '').toLowerCase(); // 只有前半段地址
+            let fullAddress = d.address.replace(/\s+/g, '').toLowerCase(); 
+            let mainAddress = d.address.split(' ')[0].replace(/\s+/g, '').toLowerCase(); 
             
-            // 邏輯1：手動打字，只要字串有包含（例如打「水蓮」或「忠孝」），就會跳出選項
-            // 邏輯2：拍照掃描，螢幕一大坨字裡包含了前半段地址，也會觸發
             if ((fullAddress.includes(s) || s.includes(mainAddress)) && count < 5) {
-                // 恢復原本乾淨、明顯可點擊的下拉選單樣式，但加上雷區圖示
-                let icon = d.mine ? '💀 雷區：' : '✅ 友善：';
+                let icon = d.mine ? '💀 發現雷區：' : '✅ 友善區：';
                 let borderColor = d.mine ? '#ff4444' : '#2ecc71';
+                let textColor = d.mine ? '#ff4444' : '#2ecc71';
                 
-                html += `<div class="suggest" style="border-left-color: ${borderColor};" onclick="selectAddress('${d.address}')">
+                html += `<div class="suggest" style="border-left-color: ${borderColor}; color: ${textColor}; font-weight: bold;" onclick="selectAddress('${d.address}')">
                             ${icon} ${d.address}
                          </div>`;
                 count++;
@@ -117,6 +120,18 @@ function saveDataToPhone() {
     catch (e) { alert("儲存失敗！"); }
 }
 
+// 🌟 升級版：使用 Google Maps 官方深度連結，直接開啟 APP 搜尋
+function directNav() {
+    let address = document.getElementById("search").value;
+    if (!address) {
+        alert("⚠️ 請先在上方輸入地址關鍵字！");
+        return;
+    }
+    // 這個網址會直接喚醒手機內的 Google Maps APP 進行搜尋與導航
+    let url = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
+    window.open(url, "_blank");
+}
+
 async function recognizeText(input) {
     if (!input.files || input.files.length === 0) return;
     let file = input.files[0];
@@ -135,12 +150,11 @@ async function recognizeText(input) {
         
         let suggestBox = document.getElementById("suggest");
         if (suggestBox.innerHTML !== "") {
-            statusText.innerText = "⚠️ 警告！發現疑似雷區！請點擊下方選項帶入！";
+            statusText.innerText = "⚠️ 警告！發現疑似雷區！看下方紅字！";
             statusText.style.color = "#ff4444";
         } else {
-            statusText.innerText = "✅ 掃描完成！沒有發現地雷。";
+            statusText.innerText = "✅ 安全！沒發現地雷，可按右邊「直接導航」。";
             statusText.style.color = "#2ecc71";
-            setTimeout(() => { document.getElementById("search").value = ""; }, 3000);
         }
         setTimeout(() => { statusText.style.display = "none"; }, 5000);
         
@@ -216,8 +230,9 @@ function remove(i) {
     }
 }
 
+// 🌟 卡片內的導航也同步升級標準連結
 function nav(address) {
-    let url = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(address);
+    let url = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
     window.open(url, "_blank");
 }
 
