@@ -20,11 +20,14 @@ button { padding: 12px 15px; margin: 5px; border: none; border-radius: 8px; font
 .delete { background: #555; color: white; }
 .reset { background: #8e44ad; color: white; width: 90%; margin-top: 30px; font-size: 14px;}
 
-/* 掃描按鈕樣式 */
 .scan-btn { background: #3498db; color: white; width: 90%; font-size: 16px; margin-top: 5px; margin-bottom: 5px;}
 
 .card { background: #222; padding: 15px; margin: 15px 5%; border-radius: 10px; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-.suggest { background: #333; margin: 5px 5%; padding: 12px; border-radius: 6px; cursor: pointer; text-align: left; font-weight: bold;}
+
+/* 🌟 修正選單外觀，讓它變回明顯可點擊的下拉選單 */
+.suggest { background: #444; color: white; margin: 5px 5%; padding: 12px; border-radius: 6px; cursor: pointer; text-align: left; border-left: 4px solid #aaa; font-size: 15px;}
+.suggest:active { background: #666; }
+
 .note { color: #ccc; font-size: 15px; margin-top: 10px; background: #333; padding: 8px; border-radius: 5px; }
 img { width: 100%; margin-top: 12px; border-radius: 8px; }
 
@@ -52,7 +55,7 @@ img { width: 100%; margin-top: 12px; border-radius: 8px; }
 </div>
 <input type="file" id="photo" accept="image/*">
 
-<button class="add" onclick="新增雷區">新增雷區</button>
+<button class="add" onclick="add()">新增雷區</button>
 
 <hr style="border: 0.5px solid #333; margin: 20px 0;">
 
@@ -74,20 +77,26 @@ let data = JSON.parse(localStorage.getItem('deliveryMines'));
 if (!data || data.length === 0) { data = defaultMines; saveDataToPhone(); }
 render();
 
-// 🌟 雙機流進化版：超強模糊比對邏輯
+// 🌟 修正版：完美融合「手動打字關聯搜尋」與「AI 掃描過濾」
 function suggest() {
-    let s = document.getElementById("search").value.replace(/\s+/g, ''); // 去除空白
+    let s = document.getElementById("search").value.replace(/\s+/g, '').toLowerCase(); 
     let html = "";
+    
     if (s !== "") {
         let count = 0;
         data.forEach(d => {
-            // 只取地址部分（用空格切開，避開後面的地標名稱干擾）
-            let mainAddress = d.address.split(' ')[0].replace(/\s+/g, ''); 
+            let fullAddress = d.address.replace(/\s+/g, '').toLowerCase(); // 完整地址包含地標
+            let mainAddress = d.address.split(' ')[0].replace(/\s+/g, '').toLowerCase(); // 只有前半段地址
             
-            // 邏輯：如果你打的字在地址裡，或是「螢幕掃出來的一大坨字」包含了你的地雷地址，就觸發警告！
-            if ((mainAddress.includes(s) || s.includes(mainAddress)) && count < 5) {
-                html += `<div class="suggest" onclick="selectAddress('${d.address}')" style="color: ${d.mine ? '#ff4444' : '#2ecc71'};">
-                            ${d.mine ? '💀 發現雷區：' : '✅ 友善：'} ${d.address}
+            // 邏輯1：手動打字，只要字串有包含（例如打「水蓮」或「忠孝」），就會跳出選項
+            // 邏輯2：拍照掃描，螢幕一大坨字裡包含了前半段地址，也會觸發
+            if ((fullAddress.includes(s) || s.includes(mainAddress)) && count < 5) {
+                // 恢復原本乾淨、明顯可點擊的下拉選單樣式，但加上雷區圖示
+                let icon = d.mine ? '💀 雷區：' : '✅ 友善：';
+                let borderColor = d.mine ? '#ff4444' : '#2ecc71';
+                
+                html += `<div class="suggest" style="border-left-color: ${borderColor};" onclick="selectAddress('${d.address}')">
+                            ${icon} ${d.address}
                          </div>`;
                 count++;
             }
@@ -108,7 +117,6 @@ function saveDataToPhone() {
     catch (e) { alert("儲存失敗！"); }
 }
 
-// 🌟 雙機流進化版：拍照掃描螢幕
 async function recognizeText(input) {
     if (!input.files || input.files.length === 0) return;
     let file = input.files[0];
@@ -122,21 +130,16 @@ async function recognizeText(input) {
         const { data: { text } } = await Tesseract.recognize(file, 'chi_tra');
         let cleanText = text.replace(/\s+/g, '');
         
-        // 將螢幕上所有亂七八糟的字塞進去
         document.getElementById("search").value = cleanText;
-        
-        // 呼叫超強比對邏輯
         suggest(); 
         
-        // 判斷有沒有抓出地雷
         let suggestBox = document.getElementById("suggest");
         if (suggestBox.innerHTML !== "") {
-            statusText.innerText = "⚠️ 警告！發現疑似雷區！請看下方！";
+            statusText.innerText = "⚠️ 警告！發現疑似雷區！請點擊下方選項帶入！";
             statusText.style.color = "#ff4444";
         } else {
             statusText.innerText = "✅ 掃描完成！沒有發現地雷。";
             statusText.style.color = "#2ecc71";
-            // 掃描完沒地雷的話，幫你把搜尋框的亂碼清空
             setTimeout(() => { document.getElementById("search").value = ""; }, 3000);
         }
         setTimeout(() => { statusText.style.display = "none"; }, 5000);
