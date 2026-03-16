@@ -6,35 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>掃雷助手 🛵</title>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
 <style>
-body {
-    background: #111;
-    color: white;
-    font-family: "微軟正黑體", Arial, sans-serif;
-    text-align: center;
-    margin: 0;
-    padding: 10px;
-}
-
-input, textarea {
-    width: 90%;
-    padding: 12px;
-    margin: 8px 0;
-    font-size: 16px;
-    box-sizing: border-box;
-    border-radius: 8px;
-    border: none;
-}
-
-button {
-    padding: 12px 15px;
-    margin: 5px;
-    border: none;
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: bold;
-    cursor: pointer;
-}
+body { background: #111; color: white; font-family: "微軟正黑體", Arial, sans-serif; text-align: center; margin: 0; padding: 10px; }
+input, textarea { width: 90%; padding: 12px; margin: 8px 0; font-size: 16px; box-sizing: border-box; border-radius: 8px; border: none; }
+button { padding: 12px 15px; margin: 5px; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
 
 .add { background: #e74c3c; color: white; width: 90%; font-size: 18px; margin-top: 10px; }
 .mine { background: #ff4444; color: white; }
@@ -43,38 +20,15 @@ button {
 .delete { background: #555; color: white; }
 .reset { background: #8e44ad; color: white; width: 90%; margin-top: 30px; font-size: 14px;}
 
-.card {
-    background: #222;
-    padding: 15px;
-    margin: 15px 5%;
-    border-radius: 10px;
-    text-align: left;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-}
+/* 掃描按鈕樣式 */
+.scan-btn { background: #3498db; color: white; width: 90%; font-size: 16px; margin-top: 5px; margin-bottom: 5px;}
 
-.suggest {
-    background: #333;
-    margin: 5px 5%;
-    padding: 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    text-align: left;
-}
+.card { background: #222; padding: 15px; margin: 15px 5%; border-radius: 10px; text-align: left; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+.suggest { background: #333; margin: 5px 5%; padding: 12px; border-radius: 6px; cursor: pointer; text-align: left; font-weight: bold;}
+.note { color: #ccc; font-size: 15px; margin-top: 10px; background: #333; padding: 8px; border-radius: 5px; }
+img { width: 100%; margin-top: 12px; border-radius: 8px; }
 
-.note {
-    color: #ccc;
-    font-size: 15px;
-    margin-top: 10px;
-    background: #333;
-    padding: 8px;
-    border-radius: 5px;
-}
-
-img {
-    width: 100%;
-    margin-top: 12px;
-    border-radius: 8px;
-}
+#ocrStatus { color: #f1c40f; font-size: 14px; margin-top: 5px; display: none; font-weight: bold; }
 </style>
 </head>
 
@@ -82,14 +36,23 @@ img {
 
 <h1>掃雷助手 🛵</h1>
 
-<input id="search" placeholder="輸入地址或路名 (如: 瑞光路)" onkeyup="suggest()">
+<input id="search" placeholder="輸入地址或點擊下方拍照掃描" onkeyup="suggest()">
+
+<button class="scan-btn" onclick="document.getElementById('ocrInput').click()">📱 拍接單螢幕：自動掃雷</button>
+<input type="file" id="ocrInput" accept="image/*" capture="environment" style="display: none;" onchange="recognizeText(this)">
+
+<div id="ocrStatus">⏳ 正在掃描螢幕文字... (約需 5 秒)</div>
+
 <div id="suggest"></div>
 
 <textarea id="note" placeholder="備註 (停車位置 / 入口 / 換證 / 沒電梯)" rows="3"></textarea>
 
+<div style="text-align: left; width: 90%; margin: 10px auto; font-size: 14px; color: #aaa;">
+    📍 附加雷區大樓外觀照片：
+</div>
 <input type="file" id="photo" accept="image/*">
 
-<button class="add" onclick="add()">新增雷區</button>
+<button class="add" onclick="新增雷區">新增雷區</button>
 
 <hr style="border: 0.5px solid #333; margin: 20px 0;">
 
@@ -100,40 +63,32 @@ img {
 <script>
 const defaultMines = [
     { address: "汐止區湖前街110巷97弄24號 水蓮山莊", mine: true, note: "佔地太大，動線複雜", photo: "" },
-    { address: "汐止區新台五路一段88號 宏碁大樓", mine: true, note: "", photo: "" },
-    { address: "汐止區新台五路一段79號 遠東世界中心", mine: true, note: "", photo: "" },
-    { address: "汐止區新台五路一段96號 東方科學園區", mine: true, note: "", photo: "" },
     { address: "汐止區新台五路一段97號 IFG遠雄廣場", mine: true, note: "百貨公司難停車、取送餐皆耗時", photo: "" },
     { address: "內湖區瑞光路全線", mine: true, note: "⚠️ 4點半後車塞到屁股發光！慎接！", photo: "" },
     { address: "內湖區成功路二段325號 三軍總醫院", mine: true, note: "醫院大魔王，佔地廣大", photo: "" },
-    { address: "內湖區民權東路六段161號 國防醫學院", mine: true, note: "門禁森嚴", photo: "" },
-    { address: "內湖區成功路五段420巷26號 康寧醫院", mine: true, note: "", photo: "" },
-    { address: "內湖區民善街205號 內湖花市", mine: true, note: "腹地大，找路麻煩", photo: "" },
-    { address: "內湖區新湖三路28號 內湖花市B館/盆花A館", mine: true, note: "", photo: "" },
-    { address: "南港區經貿二路1號 南港展覽館", mine: true, note: "展期人多難停，送餐需聯絡清楚", photo: "" },
-    { address: "南港區園區街3號 南港軟體園區", mine: true, note: "大樓多，找棟別花時間", photo: "" },
-    { address: "南港區三重路 南港軟體園區", mine: true, note: "", photo: "" },
     { address: "南港區研究院路二段128號 中央研究院", mine: true, note: "院區超大，猶如迷宮", photo: "" },
     { address: "南港區忠孝東路七段359號 南港火車站", mine: true, note: "共構商場，無法臨停", photo: "" }
 ];
 
 let data = JSON.parse(localStorage.getItem('deliveryMines'));
-if (!data || data.length === 0) {
-    data = defaultMines;
-    saveDataToPhone();
-}
-
-let knownAddresses = data.map(d => d.address);
+if (!data || data.length === 0) { data = defaultMines; saveDataToPhone(); }
 render();
 
+// 🌟 雙機流進化版：超強模糊比對邏輯
 function suggest() {
-    let s = document.getElementById("search").value;
+    let s = document.getElementById("search").value.replace(/\s+/g, ''); // 去除空白
     let html = "";
     if (s !== "") {
         let count = 0;
-        knownAddresses.forEach(a => {
-            if (a.includes(s) && count < 5) {
-                html += `<div class="suggest" onclick="selectAddress('${a}')">📍 ${a}</div>`;
+        data.forEach(d => {
+            // 只取地址部分（用空格切開，避開後面的地標名稱干擾）
+            let mainAddress = d.address.split(' ')[0].replace(/\s+/g, ''); 
+            
+            // 邏輯：如果你打的字在地址裡，或是「螢幕掃出來的一大坨字」包含了你的地雷地址，就觸發警告！
+            if ((mainAddress.includes(s) || s.includes(mainAddress)) && count < 5) {
+                html += `<div class="suggest" onclick="selectAddress('${d.address}')" style="color: ${d.mine ? '#ff4444' : '#2ecc71'};">
+                            ${d.mine ? '💀 發現雷區：' : '✅ 友善：'} ${d.address}
+                         </div>`;
                 count++;
             }
         });
@@ -149,27 +104,59 @@ function selectAddress(a) {
 }
 
 function saveDataToPhone() {
+    try { localStorage.setItem('deliveryMines', JSON.stringify(data)); } 
+    catch (e) { alert("儲存失敗！"); }
+}
+
+// 🌟 雙機流進化版：拍照掃描螢幕
+async function recognizeText(input) {
+    if (!input.files || input.files.length === 0) return;
+    let file = input.files[0];
+    
+    let statusText = document.getElementById("ocrStatus");
+    statusText.style.display = "block";
+    statusText.style.color = "#f1c40f";
+    statusText.innerText = "⏳ 正在掃描螢幕文字... (約需 5 秒)";
+    
     try {
-        localStorage.setItem('deliveryMines', JSON.stringify(data));
-        knownAddresses = data.map(d => d.address);
-    } catch (e) {
-        alert("儲存失敗！可能是照片容量太大導致手機儲存空間不足。請嘗試刪除幾筆舊照片。");
+        const { data: { text } } = await Tesseract.recognize(file, 'chi_tra');
+        let cleanText = text.replace(/\s+/g, '');
+        
+        // 將螢幕上所有亂七八糟的字塞進去
+        document.getElementById("search").value = cleanText;
+        
+        // 呼叫超強比對邏輯
+        suggest(); 
+        
+        // 判斷有沒有抓出地雷
+        let suggestBox = document.getElementById("suggest");
+        if (suggestBox.innerHTML !== "") {
+            statusText.innerText = "⚠️ 警告！發現疑似雷區！請看下方！";
+            statusText.style.color = "#ff4444";
+        } else {
+            statusText.innerText = "✅ 掃描完成！沒有發現地雷。";
+            statusText.style.color = "#2ecc71";
+            // 掃描完沒地雷的話，幫你把搜尋框的亂碼清空
+            setTimeout(() => { document.getElementById("search").value = ""; }, 3000);
+        }
+        setTimeout(() => { statusText.style.display = "none"; }, 5000);
+        
+    } catch (err) {
+        statusText.innerText = "❌ 辨識失敗，請確認螢幕無反光。";
+        setTimeout(() => { statusText.style.display = "none"; }, 4000);
     }
+    input.value = ""; 
 }
 
 function add() {
     let searchInput = document.getElementById("search");
     let noteInput = document.getElementById("note");
     let photoInput = document.getElementById("photo");
-    
     let address = searchInput.value;
     let note = noteInput.value;
     let p = photoInput.files[0];
 
-    if (!address) {
-        alert("⚠️ 請至少輸入地址喔！");
-        return;
-    }
+    if (!address) { alert("⚠️ 請至少輸入地址喔！"); return; }
 
     if (p) {
         let reader = new FileReader();
@@ -178,17 +165,12 @@ function add() {
             img.onload = function() {
                 let canvas = document.createElement('canvas');
                 let ctx = canvas.getContext('2d');
-                
-                // 🌟 終極壓縮：寬度降到 350px (夠看清楚大樓了)，容量極小！
                 let maxWidth = 350;
                 let scale = maxWidth / img.width;
                 if (scale > 1) scale = 1; 
-                
                 canvas.width = img.width * scale;
                 canvas.height = img.height * scale;
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                // 🌟 畫質降至 0.4，一張圖大約只剩 20KB~30KB
                 let compressedBase64 = canvas.toDataURL('image/jpeg', 0.4);
                 saveNewRecord(address, note, compressedBase64);
             };
@@ -208,7 +190,6 @@ function saveNewRecord(address, note, photoBase64) {
     } else {
         data.push({ address: address, mine: true, note: note, photo: photoBase64 });
     }
-
     saveDataToPhone(); 
     document.getElementById("search").value = "";
     document.getElementById("note").value = "";
@@ -237,9 +218,8 @@ function nav(address) {
     window.open(url, "_blank");
 }
 
-// 🌟 清空記憶體，把之前塞爆的巨大照片全砍掉！
 function resetApp() {
-    if (confirm("⚠️ 警告：這會清空你手機裡所有存過的照片與地址，並回復到預設的 16 筆雙北雷區清單。確定要重置嗎？")) {
+    if (confirm("⚠️ 警告：這會清空所有照片與地址。確定要重置嗎？")) {
         localStorage.removeItem('deliveryMines');
         alert("資料已清空！即將重新載入。");
         location.reload();
