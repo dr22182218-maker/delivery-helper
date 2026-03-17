@@ -2,99 +2,123 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>掃雷助手 Pro 🛵</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>掃雷助手 🛵</title>
 
 <style>
 
 body{
-background:#111;
+background:#0f0f0f;
 color:white;
 font-family:"微軟正黑體",Arial;
-text-align:center;
 margin:0;
-padding:15px;
+padding:20px;
+text-align:center;
+}
+
+h1{
+font-size:32px;
+margin-bottom:20px;
 }
 
 input,textarea{
 width:100%;
-padding:14px;
-margin:8px 0;
-font-size:16px;
-border-radius:8px;
+padding:16px;
+margin:10px 0;
+font-size:18px;
+border-radius:10px;
 border:none;
 box-sizing:border-box;
 }
 
 button{
 padding:14px;
-margin:5px 0;
 border:none;
-border-radius:8px;
+border-radius:10px;
 font-size:16px;
 font-weight:bold;
 cursor:pointer;
-width:100%;
 }
 
-.add-btn{background:#e74c3c;color:white;}
-
-.voice-btn{
+.btn-blue{
 background:#3498db;
 color:white;
 }
 
+.btn-green{
+background:#2ecc71;
+color:white;
+}
+
+.btn-red{
+background:#e74c3c;
+color:white;
+width:100%;
+margin-top:10px;
+}
+
+.actions{
+display:flex;
+gap:10px;
+justify-content:center;
+margin:10px 0;
+}
+
+.suggest-box{
+text-align:left;
+margin-top:5px;
+}
+
+.suggest-item{
+background:#2a2a2a;
+padding:12px;
+margin:5px 0;
+border-radius:6px;
+font-size:16px;
+border-left:5px solid #3498db;
+cursor:pointer;
+}
+
+.direct-nav{
+background:#27ae60;
+padding:14px;
+border-radius:8px;
+margin-top:8px;
+cursor:pointer;
+text-align:center;
+}
+
 .card{
-background:#222;
+background:#1c1c1c;
 padding:15px;
 margin:15px 0;
 border-radius:10px;
 text-align:left;
 }
 
-.suggest-box{
-text-align:left;
-margin-bottom:15px;
-}
-
-.suggest-item{
-background:#333;
-margin:5px 0;
-padding:12px;
-border-radius:6px;
-cursor:pointer;
-border-left:5px solid #aaa;
-font-size:16px;
-font-weight:bold;
-}
-
-.direct-nav{
-background:#2ecc71;
-padding:14px;
-border-radius:6px;
-margin-top:5px;
-cursor:pointer;
-text-align:center;
+.card button{
+margin-right:6px;
 }
 
 </style>
-</head>
 
+</head>
 <body>
 
-<h2>🛵 掃雷助手 Pro</h2>
+<h1>掃雷助手 🛵</h1>
 
 <input id="search" placeholder="輸入地址或語音" oninput="suggest()">
 
-<button class="voice-btn" onclick="voice()">🎤 語音輸入</button>
+<div class="actions">
+<button class="btn-blue" onclick="voice()">🎤 語音</button>
+<button class="btn-green" onclick="nav()">🗺 導航</button>
+</div>
 
 <div id="suggest" class="suggest-box"></div>
 
-<hr>
+<textarea id="note" placeholder="備註（停車 / 入口 / 換證）"></textarea>
 
-<textarea id="note" placeholder="備註 (警衛很兇 / 換證 / 沒電梯)" rows="2"></textarea>
-
-<button class="add-btn" onclick="add()">💀 新增雷區</button>
+<button class="btn-red" onclick="add()">新增雷區</button>
 
 <hr>
 
@@ -103,29 +127,13 @@ text-align:center;
 <script>
 
 const defaultMines=[
-{address:"南港區忠孝東路七段359號 南港車站",mine:true,note:"商場很難停"},
-{address:"南港區研究院路二段128號 中研院",mine:true,note:"院區很大"},
-{address:"汐止區新台五路一段97號 IFG遠雄",mine:true,note:"百貨難停"}
+{address:"南港區忠孝東路七段359號 南港火車站",mine:true,note:"共構商場"},
+{address:"南港區研究院路二段128號 中央研究院",mine:true,note:"院區很大"}
 ];
 
 const streetDB=[
-{
-key:"合順街",
-list:[
-"南港區合順街5巷",
-"南港區合順街7巷",
-"南港區合順街12弄",
-"南港區合順街20號"
-]
-},
-{
-key:"研究院路",
-list:[
-"研究院路一段",
-"研究院路二段",
-"研究院路三段"
-]
-}
+{key:"合順街",list:["合順街5巷","合順街7巷","合順街12弄"]},
+{key:"研究院路",list:["研究院路一段","研究院路二段","研究院路三段"]}
 ];
 
 let data=JSON.parse(localStorage.getItem("deliveryMines"));
@@ -134,8 +142,6 @@ if(!data||data.length==0){
 data=defaultMines;
 save();
 }
-
-render();
 
 function save(){
 localStorage.setItem("deliveryMines",JSON.stringify(data));
@@ -150,7 +156,9 @@ function generateNumbers(street){
 let arr=[];
 
 for(let i=1;i<=30;i++){
+
 arr.push(street+i+"號");
+
 }
 
 return arr;
@@ -200,8 +208,7 @@ sdb.list.forEach(addr=>{
 
 html+=`
 <div class="suggest-item"
-style="border-left-color:#3498db;color:#3498db"
-onclick="nav('${addr}')">
+onclick="navTo('${addr}')">
 📍 ${addr}
 </div>
 `;
@@ -214,12 +221,12 @@ onclick="nav('${addr}')">
 
 if(raw.length>=2){
 
-generateNumbers(raw).slice(0,8).forEach(addr=>{
+generateNumbers(raw).slice(0,6).forEach(addr=>{
 
 html+=`
 <div class="suggest-item"
-style="border-left-color:#888;color:#ccc"
-onclick="nav('${addr}')">
+style="border-left-color:#888"
+onclick="navTo('${addr}')">
 🏠 ${addr}
 </div>
 `;
@@ -230,8 +237,8 @@ onclick="nav('${addr}')">
 
 html+=`
 <div class="direct-nav"
-onclick="nav('${raw}')">
-🗺️ 直接導航：${raw}
+onclick="navTo('${raw}')">
+🗺️ 直接導航 ${raw}
 </div>
 `;
 
@@ -255,7 +262,15 @@ document.getElementById("note").value=ex.note;
 
 }
 
-function nav(addr){
+function nav(){
+
+let addr=document.getElementById("search").value;
+
+navTo(addr);
+
+}
+
+function navTo(addr){
 
 let url="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(addr);
 
@@ -277,41 +292,7 @@ return;
 
 }
 
-let idx=data.findIndex(d=>clean(d.address)==clean(addr));
-
-if(idx!=-1){
-
-data[idx].note=note;
-
-}else{
-
 data.push({address:addr,mine:true,note:note});
-
-}
-
-save();
-
-render();
-
-}
-
-function remove(i){
-
-if(confirm("刪除?")){
-
-data.splice(i,1);
-
-save();
-
-render();
-
-}
-
-}
-
-function toggleMine(i){
-
-data[i].mine=!data[i].mine;
 
 save();
 
@@ -337,18 +318,14 @@ html+=`
 
 <div>${d.note||""}</div>
 
-<button onclick="nav('${d.address}')">導航</button>
+<button onclick="navTo('${d.address}')">導航</button>
 
-<button onclick="toggleMine(${idx})">
-
+<button onclick="toggle(${idx})">
 ${d.mine?"轉友善":"設雷區"}
-
 </button>
 
-<button onclick="remove(${idx})">
-
+<button onclick="del(${idx})">
 刪除
-
 </button>
 
 </div>
@@ -358,6 +335,26 @@ ${d.mine?"轉友善":"設雷區"}
 });
 
 document.getElementById("list").innerHTML=html;
+
+}
+
+function toggle(i){
+
+data[i].mine=!data[i].mine;
+
+save();
+
+render();
+
+}
+
+function del(i){
+
+data.splice(i,1);
+
+save();
+
+render();
 
 }
 
@@ -371,15 +368,17 @@ rec.start();
 
 rec.onresult=function(e){
 
-let t=e.results[0][0].transcript;
+let text=e.results[0][0].transcript;
 
-document.getElementById("search").value=t;
+document.getElementById("search").value=text;
 
 suggest();
 
 };
 
 }
+
+render();
 
 </script>
 
