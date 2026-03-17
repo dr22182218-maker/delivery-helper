@@ -8,25 +8,31 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
+
 body{
 background:#111;
 color:white;
 font-family:Arial;
 text-align:center;
-padding:10px;
+margin:0;
+padding:15px;
+}
+
+h1{
+margin-bottom:20px;
 }
 
 input,textarea{
 width:90%;
 padding:12px;
-margin:8px;
+margin:8px 0;
 font-size:16px;
 border-radius:8px;
 border:none;
 }
 
 button{
-padding:12px 15px;
+padding:12px;
 margin:5px;
 border:none;
 border-radius:8px;
@@ -35,11 +41,37 @@ font-weight:bold;
 cursor:pointer;
 }
 
-.add{background:#e74c3c;color:white;width:90%;}
-.nav{background:#2ecc71;color:white;}
-.mine{background:#ff4444;color:white;}
-.safe{background:#f39c12;color:white;}
-.delete{background:#555;color:white;}
+.scan{
+background:#3498db;
+color:white;
+}
+
+.nav{
+background:#2ecc71;
+color:white;
+}
+
+.add{
+background:#e74c3c;
+color:white;
+width:90%;
+margin-top:10px;
+}
+
+.mine{
+background:#ff4444;
+color:white;
+}
+
+.safe{
+background:#f39c12;
+color:white;
+}
+
+.delete{
+background:#555;
+color:white;
+}
 
 .card{
 background:#222;
@@ -57,26 +89,34 @@ border-radius:6px;
 cursor:pointer;
 }
 
+.note{
+background:#333;
+padding:8px;
+border-radius:5px;
+margin-top:10px;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<h2>掃雷助手 🛵</h2>
+<h1>掃雷助手 🛵</h1>
 
 <input id="search" placeholder="輸入地址或關鍵字" oninput="suggest()">
 
 <br>
 
-<button onclick="document.getElementById('ocr').click()">📷 拍訂單</button>
+<button class="scan" onclick="document.getElementById('ocr').click()">📷 拍訂單</button>
 
-<button onclick="directNav()">🗺️ 直接導航</button>
+<button class="nav" onclick="directNav()">🗺️ 直接導航</button>
 
 <input type="file" id="ocr" accept="image/*" capture="environment" style="display:none" onchange="scan(this)">
 
 <div id="suggest"></div>
 
-<textarea id="note" placeholder="備註"></textarea>
+<textarea id="note" placeholder="備註 (停車 / 入口 / 換證)"></textarea>
 
 <button class="add" onclick="add()">新增雷區</button>
 
@@ -86,46 +126,69 @@ cursor:pointer;
 
 <script>
 
+
 const defaultMines=[
+
 {address:"汐止區湖前街110巷97弄24號 水蓮山莊",mine:true,note:"社區很大"},
+
+{address:"汐止區新台五路一段97號 IFG遠雄廣場",mine:true,note:"百貨難停車"},
+
 {address:"內湖區瑞光路全線",mine:true,note:"下班時間爆塞"},
-{address:"南港區忠孝東路七段359號 南港火車站",mine:true,note:"停車困難"},
-{address:"內湖區成功路二段325號 三軍總醫院",mine:true,note:"醫院地獄"},
-{address:"南港區研究院路二段128號 中央研究院",mine:true,note:"院區迷宮"}
+
+{address:"內湖區成功路二段325號 三軍總醫院",mine:true,note:"醫院迷宮"},
+
+{address:"南港區忠孝東路七段359號 南港火車站",mine:true,note:"共構商場"},
+
+{address:"南港區研究院路二段128號 中央研究院",mine:true,note:"院區很大"}
+
 ];
 
 let data=JSON.parse(localStorage.getItem("deliveryMines"));
 
 if(!data){
+
 data=defaultMines;
+
 save();
+
 }
 
 render();
 
+
 function save(){
+
 localStorage.setItem("deliveryMines",JSON.stringify(data));
+
 }
+
+
 
 function suggest(){
 
 let s=document.getElementById("search").value
+
 .replace(/\s+/g,"")
+
 .toLowerCase();
 
 let html="";
 
 data.forEach(d=>{
 
-let addr=d.address.replace(/\s+/g,"").toLowerCase();
+let addr=d.address
 
-if(addr.includes(s)&&s!=""){
+.replace(/\s+/g,"")
 
-html+=`
-<div class="suggest" onclick="selectAddress('${d.address}')">
+.toLowerCase();
+
+if((addr.includes(s)||s.includes(addr))&&s!=""){
+
+html+=`<div class="suggest" onclick="selectAddress('${d.address}')">
+
 ${d.mine?"💀":"✅"} ${d.address}
-</div>
-`;
+
+</div>`;
 
 }
 
@@ -135,6 +198,8 @@ document.getElementById("suggest").innerHTML=html;
 
 }
 
+
+
 function selectAddress(a){
 
 document.getElementById("search").value=a;
@@ -143,24 +208,48 @@ document.getElementById("suggest").innerHTML="";
 
 }
 
+
+
+function nav(address){
+
+let url="https://maps.google.com/?q="+encodeURIComponent(address);
+
+window.open(url,"_blank");
+
+}
+
+
+
 function directNav(){
 
 let address=document.getElementById("search").value;
 
 if(!address){
+
 alert("請輸入地址");
+
 return;
+
 }
 
 let found=data.find(d=>
+
 address.replace(/\s+/g,"")
-.includes(d.address.replace(/\s+/g,""))
+
+.includes(
+
+d.address.replace(/\s+/g,"")
+
+)
+
 );
 
 if(found&&found.mine){
 
 if(!confirm("⚠️ 雷區\n\n"+found.address+"\n\n仍要導航?")){
+
 return;
+
 }
 
 }
@@ -169,13 +258,7 @@ nav(address);
 
 }
 
-function nav(address){
 
-let url="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(address);
-
-window.open(url,"_blank");
-
-}
 
 async function scan(input){
 
@@ -185,14 +268,24 @@ let file=input.files[0];
 
 const {data:{text}}=await Tesseract.recognize(file,"chi_tra");
 
-let clean=text.replace(/\s+/g,"");
+let clean=text
+
+.replace(/\s+/g,'')
+
+.replace(/[^\u4e00-\u9fa50-9號段路街巷弄區市縣]/g,'');
 
 document.getElementById("search").value=clean;
 
 suggest();
 
 let found=data.find(d=>
-clean.includes(d.address.replace(/\s+/g,""))
+
+clean.includes(
+
+d.address.replace(/\s+/g,'')
+
+)
+
 );
 
 setTimeout(()=>{
@@ -200,7 +293,9 @@ setTimeout(()=>{
 if(found&&found.mine){
 
 if(confirm("⚠️ 發現雷區\n\n"+found.address+"\n\n是否導航?")){
+
 nav(found.address);
+
 }
 
 }else{
@@ -213,6 +308,8 @@ nav(clean);
 
 }
 
+
+
 function add(){
 
 let address=document.getElementById("search").value;
@@ -220,14 +317,21 @@ let address=document.getElementById("search").value;
 let note=document.getElementById("note").value;
 
 if(!address){
+
 alert("請輸入地址");
+
 return;
+
 }
 
 data.push({
+
 address:address,
+
 mine:true,
+
 note:note
+
 });
 
 save();
@@ -235,9 +339,12 @@ save();
 render();
 
 document.getElementById("search").value="";
+
 document.getElementById("note").value="";
 
 }
+
+
 
 function remove(i){
 
@@ -249,6 +356,8 @@ render();
 
 }
 
+
+
 function toggleMine(i){
 
 data[i].mine=!data[i].mine;
@@ -259,6 +368,8 @@ render();
 
 }
 
+
+
 function render(){
 
 let html="";
@@ -268,21 +379,27 @@ data.slice().reverse().forEach((d,i)=>{
 let idx=data.length-1-i;
 
 html+=`
+
 <div class="card">
 
 <h3>${d.mine?"💀":"✅"} ${d.address}</h3>
 
-<p>${d.note||""}</p>
+${d.note?`<div class="note">📝 ${d.note}</div>`:""}
+
+<br>
 
 <button class="nav" onclick="nav('${d.address}')">導航</button>
 
 <button class="${d.mine?'safe':'mine'}" onclick="toggleMine(${idx})">
+
 ${d.mine?"轉友善":"設雷區"}
+
 </button>
 
 <button class="delete" onclick="remove(${idx})">刪除</button>
 
 </div>
+
 `;
 
 });
