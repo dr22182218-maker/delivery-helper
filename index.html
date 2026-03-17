@@ -8,7 +8,6 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
-
 body{
 background:#111;
 color:white;
@@ -32,6 +31,7 @@ margin:5px;
 border:none;
 border-radius:8px;
 font-weight:bold;
+cursor:pointer;
 }
 
 .scan{background:#3498db;color:white;}
@@ -50,12 +50,15 @@ text-align:left;
 }
 
 .suggest{
-background:#333;
-margin:5px;
-padding:10px;
+background:#444;
+margin:5px 5%;
+padding:12px;
 border-radius:6px;
 cursor:pointer;
+text-align:left;
+border-left:4px solid #aaa;
 }
+.suggest:active { background: #666; }
 
 </style>
 
@@ -65,7 +68,7 @@ cursor:pointer;
 
 <h1>掃雷助手 🛵</h1>
 
-<input id="search" placeholder="輸入地址或關鍵字" oninput="suggest()">
+<input id="search" placeholder="輸入地址或點擊下方拍訂單" oninput="suggest()">
 
 <br>
 
@@ -88,179 +91,187 @@ cursor:pointer;
 <script>
 
 const defaultMines=[
-
 {address:"南港區忠孝東路七段359號 南港火車站",mine:true,note:"共構商場"},
 {address:"南港區研究院路二段128號 中央研究院",mine:true,note:"院區很大"},
 {address:"汐止區新台五路一段97號 IFG遠雄廣場",mine:true,note:"百貨難停車"}
-
 ];
 
 let data=JSON.parse(localStorage.getItem("deliveryMines"));
 
 if(!data){
-data=defaultMines;
-save();
+    data=defaultMines;
+    save();
 }
 
 render();
 
 function save(){
-localStorage.setItem("deliveryMines",JSON.stringify(data));
+    localStorage.setItem("deliveryMines",JSON.stringify(data));
 }
 
 function clean(str){
-return str.replace(/\s+/g,"").toLowerCase();
+    return str.replace(/\s+/g,"").toLowerCase();
 }
 
+// 🌟 修復 1：雙向關聯搜尋引擎
 function suggest(){
+    let s=clean(document.getElementById("search").value);
 
-let s=clean(document.getElementById("search").value);
+    // 拿掉長度限制，只要有打字（即使只有一個字）就會觸發搜尋
+    if(s === ""){
+        document.getElementById("suggest").innerHTML="";
+        return;
+    }
 
-if(s.length<2){
-document.getElementById("suggest").innerHTML="";
-return;
-}
+    let html="";
+    let count = 0;
 
-let html="";
+    data.forEach(d=>{
+        let fullAddr=clean(d.address);
+        let mainAddr=clean(d.address.split(" ")[0]); // 只取前半段地址（避開火車站等字眼干擾）
 
-data.forEach(d=>{
+        // 雙向比對：如果你打的字包含在地址裡，或是「螢幕亂碼」裡面藏著地址，就觸發！
+        if((fullAddr.includes(s) || s.includes(mainAddr)) && count < 5){
+            let borderColor = d.mine ? '#ff4444' : '#2ecc71';
+            html+=`<div class="suggest" style="border-left-color: ${borderColor};" onclick="selectAddress('${d.address}')">
+            ${d.mine?"💀":"✅"} ${d.address}
+            </div>`;
+            count++;
+        }
+    });
 
-let addr=clean(d.address);
-
-if(addr.includes(s)){
-
-html+=`<div class="suggest" onclick="selectAddress('${d.address}')">
-${d.mine?"💀":"✅"} ${d.address}
-</div>`;
-
-}
-
-});
-
-document.getElementById("suggest").innerHTML=html;
-
+    document.getElementById("suggest").innerHTML=html;
 }
 
 function selectAddress(a){
-document.getElementById("search").value=a;
-document.getElementById("suggest").innerHTML="";
+    document.getElementById("search").value=a;
+    document.getElementById("suggest").innerHTML="";
 }
 
+// 🌟 修復 2：正規 Google Maps 導航網址（解決彈出視窗被擋的問題）
 function nav(address){
-window.open("https://maps.google.com/?q="+encodeURIComponent(address));
+    let url = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(address);
+    window.open(url, "_blank");
 }
 
 function directNav(){
+    let address=document.getElementById("search").value;
 
-let address=document.getElementById("search").value;
+    if(!address){
+        alert("請輸入地址");
+        return;
+    }
 
-if(!address){
-alert("請輸入地址");
-return;
+    // 檢查是不是要去雷區，是的話跳警告
+    let found=data.find(d=>{
+        let mainAddr = clean(d.address.split(" ")[0]);
+        return clean(address).includes(mainAddr);
+    });
+
+    if(found && found.mine){
+        if(!confirm("⚠️ 警告：這是雷區！\n\n"+found.address+"\n\n仍要繼續導航?")){
+            return;
+        }
+    }
+
+    nav(address);
 }
 
-let found=data.find(d=>clean(address).includes(clean(d.address)));
-
-if(found && found.mine){
-
-if(!confirm("⚠️ 雷區\n\n"+found.address+"\n\n仍要導航?")){
-return;
-}
-
-}
-
-nav(address);
-
-}
-
+// 🌟 修復 3：強化防亂碼機制的 OCR
 async function scan(input){
+    if(!input.files[0])return;
+    
+    document.getElementById("search").value = "⏳ 辨識中...";
+    
+    try {
+        const {data:{text}}=await Tesseract.recognize(input.files[0],"chi_tra");
+        
+        // 把所有的空白跟換行清乾淨
+        let rawText = text.replace(/\s+/g,"");
+        
+        // 嘗試精準捕捉地址（包含區/市、路/街/道/巷、號）
+        let addr = rawText.match(/[\u4e00-\u9fa5]{2,}(區|市).+?(路|街|道|巷).+?\d+號/);
 
-if(!input.files[0])return;
+        if(addr){
+            document.getElementById("search").value=addr[0];
+        }else{
+            // 如果抓不到完美地址，就把整段字（即使有亂碼）塞進去
+            // 下方的 suggest() 引擎會自動從這堆亂碼中找出「隱藏的雷區」
+            document.getElementById("search").value=rawText;
+        }
 
-const {data:{text}}=await Tesseract.recognize(input.files[0],"chi_tra");
-
-let addr=text.match(/[\u4e00-\u9fa5]{2,}(區|市).+?(路|街).+?\d+號/);
-
-if(addr){
-
-document.getElementById("search").value=addr[0];
-
-}else{
-
-document.getElementById("search").value=text;
-
-}
-
-suggest();
-
+        suggest(); // 呼叫關聯搜尋
+        
+    } catch (err) {
+        document.getElementById("search").value = "";
+        alert("辨識失敗，請重試");
+    }
+    
+    input.value = ""; // 清空相機，下次才能重拍
 }
 
 function add(){
+    let address=document.getElementById("search").value;
+    let note=document.getElementById("note").value;
 
-let address=document.getElementById("search").value;
-let note=document.getElementById("note").value;
+    if(!address){
+        alert("請輸入地址");
+        return;
+    }
 
-if(!address){
-alert("請輸入地址");
-return;
-}
+    // 防止重複新增
+    let existingIndex = data.findIndex(d => clean(d.address) === clean(address));
+    if (existingIndex !== -1) {
+        data[existingIndex].note = note;
+    } else {
+        data.push({address:address,mine:true,note:note});
+    }
 
-data.push({address:address,mine:true,note:note});
+    save();
+    render();
 
-save();
-render();
-
-document.getElementById("search").value="";
-document.getElementById("note").value="";
-
+    document.getElementById("search").value="";
+    document.getElementById("note").value="";
+    document.getElementById("suggest").innerHTML="";
 }
 
 function remove(i){
-data.splice(i,1);
-save();
-render();
+    if(confirm("確定刪除？")){
+        data.splice(i,1);
+        save();
+        render();
+    }
 }
 
 function toggleMine(i){
-data[i].mine=!data[i].mine;
-save();
-render();
+    data[i].mine=!data[i].mine;
+    save();
+    render();
 }
 
 function render(){
+    let html="";
 
-let html="";
+    data.slice().reverse().forEach((d,i)=>{
+        let idx=data.length-1-i;
+        
+        let border = d.mine ? 'border-left: 6px solid #ff4444;' : 'border-left: 6px solid #2ecc71;';
 
-data.slice().reverse().forEach((d,i)=>{
+        html+=`
+        <div class="card" style="${border}">
+        <h3 style="margin-top:0;">${d.mine?"💀":"✅"} ${d.address}</h3>
+        ${d.note?`<div style="color:#ccc; background:#333; padding:8px; border-radius:5px; margin-bottom:10px;">📝 ${d.note}</div>`:""}
+        
+        <button class="nav" onclick="nav('${d.address}')">導航</button>
+        <button class="${d.mine?'safe':'mine'}" onclick="toggleMine(${idx})">
+        ${d.mine?"轉友善":"設雷區"}
+        </button>
+        <button class="delete" onclick="remove(${idx})">刪除</button>
+        </div>
+        `;
+    });
 
-let idx=data.length-1-i;
-
-html+=`
-
-<div class="card">
-
-<h3>${d.mine?"💀":"✅"} ${d.address}</h3>
-
-${d.note?`<div>${d.note}</div>`:""}
-
-<br>
-
-<button class="nav" onclick="nav('${d.address}')">導航</button>
-
-<button class="${d.mine?'safe':'mine'}" onclick="toggleMine(${idx})">
-${d.mine?"轉友善":"設雷區"}
-</button>
-
-<button class="delete" onclick="remove(${idx})">刪除</button>
-
-</div>
-
-`;
-
-});
-
-document.getElementById("list").innerHTML=html;
-
+    document.getElementById("list").innerHTML=html;
 }
 
 </script>
