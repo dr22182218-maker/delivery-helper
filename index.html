@@ -6,7 +6,6 @@
 <title>掃雷助手 🛵</title>
 
 <style>
-
 body{
 background:#0f0f0f;
 color:white;
@@ -98,11 +97,11 @@ text-align:left;
 
 .card button{
 margin-right:6px;
+margin-top:6px;
 }
-
 </style>
-
 </head>
+
 <body>
 
 <h1>掃雷助手 🛵</h1>
@@ -110,13 +109,13 @@ margin-right:6px;
 <input id="search" placeholder="輸入地址或語音" oninput="suggest()">
 
 <div class="actions">
-<button class="btn-blue" onclick="voice()">🎤 語音</button>
-<button class="btn-green" onclick="nav()">🗺 導航</button>
+<button class="btn-blue" onclick="voice()">🎤 語音輸入</button>
+<button class="btn-green" onclick="nav()">🗺️ 直接導航</button>
 </div>
 
 <div id="suggest" class="suggest-box"></div>
 
-<textarea id="note" placeholder="備註（停車 / 入口 / 換證）"></textarea>
+<textarea id="note" placeholder="備註（停車 / 入口 / 社區名）"></textarea>
 
 <button class="btn-red" onclick="add()">新增雷區</button>
 
@@ -132,8 +131,24 @@ const defaultMines=[
 ];
 
 const streetDB=[
-{key:"合順街",list:["合順街5巷","合順街7巷","合順街12弄"]},
-{key:"研究院路",list:["研究院路一段","研究院路二段","研究院路三段"]}
+{
+key:"合順街",
+list:[
+"南港區合順街1號",
+"南港區合順街5巷",
+"南港區合順街7巷",
+"南港區合順街12弄",
+"南港區合順街20號"
+]
+},
+{
+key:"研究院路",
+list:[
+"南港區研究院路一段",
+"南港區研究院路二段",
+"南港區研究院路三段"
+]
+}
 ];
 
 let data=JSON.parse(localStorage.getItem("deliveryMines"));
@@ -156,9 +171,7 @@ function generateNumbers(street){
 let arr=[];
 
 for(let i=1;i<=30;i++){
-
-arr.push(street+i+"號");
-
+arr.push("南港區"+street+i+"號");
 }
 
 return arr;
@@ -168,9 +181,7 @@ return arr;
 function suggest(){
 
 let raw=document.getElementById("search").value;
-
 let s=clean(raw);
-
 let box=document.getElementById("suggest");
 
 if(!raw){
@@ -185,7 +196,6 @@ data.forEach(d=>{
 if(clean(d.address).includes(s)){
 
 let color=d.mine?"#ff4444":"#2ecc71";
-
 let icon=d.mine?"💀":"✅";
 
 html+=`
@@ -202,12 +212,15 @@ ${icon} ${d.address}
 
 streetDB.forEach(sdb=>{
 
-if(clean(sdb.key).includes(s)){
+let key=clean(sdb.key);
+
+if(s.includes(key) || key.includes(s)){
 
 sdb.list.forEach(addr=>{
 
 html+=`
 <div class="suggest-item"
+style="border-left-color:#3498db;color:#3498db"
 onclick="navTo('${addr}')">
 📍 ${addr}
 </div>
@@ -225,7 +238,7 @@ generateNumbers(raw).slice(0,6).forEach(addr=>{
 
 html+=`
 <div class="suggest-item"
-style="border-left-color:#888"
+style="border-left-color:#888;color:#ccc"
 onclick="navTo('${addr}')">
 🏠 ${addr}
 </div>
@@ -249,15 +262,12 @@ box.innerHTML=html;
 function selectAddress(a){
 
 document.getElementById("search").value=a;
-
 document.getElementById("suggest").innerHTML="";
 
 let ex=data.find(d=>d.address==a);
 
-if(ex&&ex.note){
-
+if(ex && ex.note){
 document.getElementById("note").value=ex.note;
-
 }
 
 }
@@ -265,6 +275,11 @@ document.getElementById("note").value=ex.note;
 function nav(){
 
 let addr=document.getElementById("search").value;
+
+if(!addr){
+alert("請輸入地址");
+return;
+}
 
 navTo(addr);
 
@@ -281,22 +296,27 @@ window.open(url,"_blank");
 function add(){
 
 let addr=document.getElementById("search").value;
-
 let note=document.getElementById("note").value;
 
 if(!addr){
-
 alert("請輸入地址");
-
 return;
-
 }
 
+let idx=data.findIndex(d=>clean(d.address)==clean(addr));
+
+if(idx!=-1){
+data[idx].note=note;
+}else{
 data.push({address:addr,mine:true,note:note});
+}
 
 save();
-
 render();
+
+document.getElementById("search").value="";
+document.getElementById("note").value="";
+document.getElementById("suggest").innerHTML="";
 
 }
 
@@ -307,7 +327,6 @@ let html="";
 data.slice().reverse().forEach((d,i)=>{
 
 let idx=data.length-1-i;
-
 let color=d.mine?"#ff4444":"#2ecc71";
 
 html+=`
@@ -316,11 +335,11 @@ html+=`
 
 <h3>${d.mine?"💀":"✅"} ${d.address}</h3>
 
-<div>${d.note||""}</div>
+<div style="color:#ccc;margin:8px 0">${d.note||""}</div>
 
-<button onclick="navTo('${d.address}')">導航</button>
+<button class="btn-green" onclick="navTo('${d.address}')">導航</button>
 
-<button onclick="toggle(${idx})">
+<button class="btn-red" onclick="toggle(${idx})">
 ${d.mine?"轉友善":"設雷區"}
 </button>
 
@@ -343,18 +362,17 @@ function toggle(i){
 data[i].mine=!data[i].mine;
 
 save();
-
 render();
 
 }
 
 function del(i){
 
+if(confirm("確定刪除？")){
 data.splice(i,1);
-
 save();
-
 render();
+}
 
 }
 
