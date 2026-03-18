@@ -37,6 +37,7 @@ font-weight:bold;
 .mine{background:#ff4444;color:white;}
 .safe{background:#f39c12;color:white;}
 .delete{background:#555;color:white;}
+.voice{background:#3498db;color:white;}
 
 .card{
 background:#222;
@@ -73,6 +74,7 @@ margin-top:10px;
 
 <div id="suggest"></div>
 
+<button class="voice" onclick="voiceSearch()">🎤 語音輸入</button>
 <button class="nav" onclick="directNav()">🗺️ 直接導航</button>
 
 <textarea id="note" placeholder="備註 (停車 / 入口 / 社區名)"></textarea>
@@ -108,25 +110,22 @@ localStorage.setItem("deliveryMines",JSON.stringify(data));
 function suggest(){
 
 let keyword=document.getElementById("search").value
-.toLowerCase()
-.replace(/\s+/g,"");
-
-let html="";
+.trim()
+.toLowerCase();
 
 if(keyword===""){
 document.getElementById("suggest").innerHTML="";
 return;
 }
 
+let html="";
+
 data.forEach(d=>{
 
 let addr=(d.address||"").toLowerCase();
 let note=(d.note||"").toLowerCase();
 
-let addrClean=addr.replace(/\s+/g,"");
-let noteClean=note.replace(/\s+/g,"");
-
-if(addrClean.includes(keyword) || noteClean.includes(keyword)){
+if(addr.includes(keyword) || note.includes(keyword)){
 
 html+=`
 <div class="suggest" onclick="selectAddress('${d.address}')">
@@ -149,8 +148,27 @@ document.getElementById("suggest").innerHTML=html;
 function selectAddress(a){
 
 document.getElementById("search").value=a;
-
 document.getElementById("suggest").innerHTML="";
+
+}
+
+function voiceSearch(){
+
+const recognition=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
+
+recognition.lang="zh-TW";
+
+recognition.start();
+
+recognition.onresult=function(event){
+
+let text=event.results[0][0].transcript;
+
+document.getElementById("search").value=text;
+
+suggest();
+
+};
 
 }
 
