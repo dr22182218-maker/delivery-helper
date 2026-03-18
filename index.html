@@ -2,97 +2,123 @@
 <html>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>掃雷助手 🛵</title>
-
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
 <style>
 
 body{
-background:#111;
+background:#0f0f0f;
 color:white;
-font-family:Arial;
-text-align:center;
+font-family:"微軟正黑體",Arial;
 margin:0;
-padding:15px;
+padding:20px;
+text-align:center;
 }
 
 h1{
+font-size:32px;
 margin-bottom:20px;
 }
 
 input,textarea{
-width:90%;
-padding:12px;
-margin:8px 0;
-font-size:16px;
-border-radius:8px;
+width:100%;
+padding:16px;
+margin:10px 0;
+font-size:18px;
+border-radius:10px;
 border:none;
+box-sizing:border-box;
 }
 
 button{
-padding:12px;
-margin:5px;
+padding:14px;
 border:none;
-border-radius:8px;
-font-size:15px;
+border-radius:10px;
+font-size:16px;
 font-weight:bold;
 cursor:pointer;
 }
 
-.scan{background:#3498db;color:white;}
-.nav{background:#2ecc71;color:white;}
-.add{background:#e74c3c;color:white;width:90%;}
-.mine{background:#ff4444;color:white;}
-.safe{background:#f39c12;color:white;}
-.delete{background:#555;color:white;}
+.btn-blue{
+background:#3498db;
+color:white;
+}
+
+.btn-green{
+background:#2ecc71;
+color:white;
+}
+
+.btn-red{
+background:#e74c3c;
+color:white;
+width:100%;
+margin-top:10px;
+}
+
+.actions{
+display:flex;
+gap:10px;
+justify-content:center;
+margin:10px 0;
+}
+
+.suggest-box{
+text-align:left;
+margin-top:5px;
+}
+
+.suggest-item{
+background:#2a2a2a;
+padding:12px;
+margin:5px 0;
+border-radius:6px;
+font-size:16px;
+border-left:5px solid #3498db;
+cursor:pointer;
+}
+
+.direct-nav{
+background:#27ae60;
+padding:14px;
+border-radius:8px;
+margin-top:8px;
+cursor:pointer;
+text-align:center;
+}
 
 .card{
-background:#222;
+background:#1c1c1c;
 padding:15px;
-margin:15px 5%;
+margin:15px 0;
 border-radius:10px;
 text-align:left;
 }
 
-.suggest{
-background:#333;
-margin:5px 5%;
-padding:10px;
-border-radius:6px;
-cursor:pointer;
-}
-
-.note{
-background:#333;
-padding:8px;
-border-radius:5px;
-margin-top:10px;
+.card button{
+margin-right:6px;
 }
 
 </style>
 
 </head>
-
 <body>
 
 <h1>掃雷助手 🛵</h1>
 
-<input id="search" placeholder="輸入地址或關鍵字" oninput="suggest()">
+<input id="search" placeholder="輸入地址或語音" oninput="suggest()">
 
-<br>
+<div class="actions">
+<button class="btn-blue" onclick="voice()">🎤 語音</button>
+<button class="btn-green" onclick="nav()">🗺 導航</button>
+</div>
 
-<button class="scan" onclick="document.getElementById('ocr').click()">📷 拍訂單</button>
-<button class="nav" onclick="directNav()">🗺️ 直接導航</button>
+<div id="suggest" class="suggest-box"></div>
 
-<input type="file" id="ocr" accept="image/*" capture="environment" style="display:none" onchange="scan(this)">
+<textarea id="note" placeholder="備註（停車 / 入口 / 換證）"></textarea>
 
-<div id="suggest"></div>
-
-<textarea id="note" placeholder="備註 (停車 / 入口 / 換證)"></textarea>
-
-<button class="add" onclick="add()">新增雷區</button>
+<button class="btn-red" onclick="add()">新增雷區</button>
 
 <hr>
 
@@ -101,39 +127,54 @@ margin-top:10px;
 <script>
 
 const defaultMines=[
-
-{address:"汐止區湖前街110巷97弄24號 水蓮山莊",mine:true,note:"社區很大"},
-{address:"汐止區新台五路一段97號 IFG遠雄廣場",mine:true,note:"百貨難停車"},
-{address:"內湖區瑞光路",mine:true,note:"下班時間爆塞"},
-{address:"內湖區成功路二段325號 三軍總醫院",mine:true,note:"醫院迷宮"},
 {address:"南港區忠孝東路七段359號 南港火車站",mine:true,note:"共構商場"},
 {address:"南港區研究院路二段128號 中央研究院",mine:true,note:"院區很大"}
+];
 
+const streetDB=[
+{key:"合順街",list:["合順街5巷","合順街7巷","合順街12弄"]},
+{key:"研究院路",list:["研究院路一段","研究院路二段","研究院路三段"]}
 ];
 
 let data=JSON.parse(localStorage.getItem("deliveryMines"));
 
-if(!data){
+if(!data||data.length==0){
 data=defaultMines;
 save();
 }
-
-render();
 
 function save(){
 localStorage.setItem("deliveryMines",JSON.stringify(data));
 }
 
-function normalize(str){
+function clean(str){
 return str.replace(/\s+/g,"").toLowerCase();
+}
+
+function generateNumbers(street){
+
+let arr=[];
+
+for(let i=1;i<=30;i++){
+
+arr.push(street+i+"號");
+
+}
+
+return arr;
+
 }
 
 function suggest(){
 
-let s=normalize(document.getElementById("search").value);
+let raw=document.getElementById("search").value;
 
-if(s.length<2){
-document.getElementById("suggest").innerHTML="";
+let s=clean(raw);
+
+let box=document.getElementById("suggest");
+
+if(!raw){
+box.innerHTML="";
 return;
 }
 
@@ -141,132 +182,122 @@ let html="";
 
 data.forEach(d=>{
 
-let addr=normalize(d.address);
+if(clean(d.address).includes(s)){
 
-if(addr.includes(s) || s.includes(addr)){
+let color=d.mine?"#ff4444":"#2ecc71";
 
-html+=`<div class="suggest" onclick="selectAddress('${d.address}')">
-${d.mine?"💀":"✅"} ${d.address}
-</div>`;
+let icon=d.mine?"💀":"✅";
+
+html+=`
+<div class="suggest-item"
+style="border-left-color:${color};color:${color}"
+onclick="selectAddress('${d.address}')">
+${icon} ${d.address}
+</div>
+`;
 
 }
 
 });
 
-document.getElementById("suggest").innerHTML=html;
+streetDB.forEach(sdb=>{
+
+if(clean(sdb.key).includes(s)){
+
+sdb.list.forEach(addr=>{
+
+html+=`
+<div class="suggest-item"
+onclick="navTo('${addr}')">
+📍 ${addr}
+</div>
+`;
+
+});
+
+}
+
+});
+
+if(raw.length>=2){
+
+generateNumbers(raw).slice(0,6).forEach(addr=>{
+
+html+=`
+<div class="suggest-item"
+style="border-left-color:#888"
+onclick="navTo('${addr}')">
+🏠 ${addr}
+</div>
+`;
+
+});
+
+}
+
+html+=`
+<div class="direct-nav"
+onclick="navTo('${raw}')">
+🗺️ 直接導航 ${raw}
+</div>
+`;
+
+box.innerHTML=html;
 
 }
 
 function selectAddress(a){
+
 document.getElementById("search").value=a;
+
 document.getElementById("suggest").innerHTML="";
+
+let ex=data.find(d=>d.address==a);
+
+if(ex&&ex.note){
+
+document.getElementById("note").value=ex.note;
+
 }
 
-function nav(address){
+}
 
-let url="https://maps.google.com/?q="+encodeURIComponent(address);
+function nav(){
+
+let addr=document.getElementById("search").value;
+
+navTo(addr);
+
+}
+
+function navTo(addr){
+
+let url="https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(addr);
 
 window.open(url,"_blank");
 
 }
 
-function directNav(){
-
-let address=document.getElementById("search").value;
-
-if(!address){
-alert("請輸入地址");
-return;
-}
-
-let found=data.find(d=>
-normalize(address).includes(normalize(d.address))
-);
-
-if(found && found.mine){
-
-if(!confirm("⚠️ 雷區\n\n"+found.address+"\n\n仍要導航?")){
-return;
-}
-
-}
-
-nav(address);
-
-}
-
-async function scan(input){
-
-if(!input.files[0])return;
-
-let file=input.files[0];
-
-const {data:{text}}=await Tesseract.recognize(file,"chi_tra");
-
-let clean=text
-.replace(/\s+/g,'')
-.replace(/[^\u4e00-\u9fa50-9號段路街巷弄區市縣之]/g,'');
-
-document.getElementById("search").value=clean;
-
-suggest();
-
-let found=data.find(d=>
-clean.includes(normalize(d.address))
-);
-
-setTimeout(()=>{
-
-if(found && found.mine){
-
-if(confirm("⚠️ 發現雷區\n\n"+found.address+"\n\n是否導航?")){
-nav(found.address);
-}
-
-}else{
-
-nav(clean);
-
-}
-
-},800);
-
-}
-
 function add(){
 
-let address=document.getElementById("search").value;
+let addr=document.getElementById("search").value;
+
 let note=document.getElementById("note").value;
 
-if(!address){
+if(!addr){
+
 alert("請輸入地址");
+
 return;
-}
-
-data.push({
-address:address,
-mine:true,
-note:note
-});
-
-save();
-render();
-
-document.getElementById("search").value="";
-document.getElementById("note").value="";
 
 }
 
-function remove(i){
-data.splice(i,1);
-save();
-render();
-}
+data.push({address:addr,mine:true,note:note});
 
-function toggleMine(i){
-data[i].mine=!data[i].mine;
 save();
+
 render();
+
 }
 
 function render(){
@@ -277,23 +308,25 @@ data.slice().reverse().forEach((d,i)=>{
 
 let idx=data.length-1-i;
 
+let color=d.mine?"#ff4444":"#2ecc71";
+
 html+=`
 
-<div class="card">
+<div class="card" style="border-left:6px solid ${color}">
 
 <h3>${d.mine?"💀":"✅"} ${d.address}</h3>
 
-${d.note?`<div class="note">📝 ${d.note}</div>`:""}
+<div>${d.note||""}</div>
 
-<br>
+<button onclick="navTo('${d.address}')">導航</button>
 
-<button class="nav" onclick="nav('${d.address}')">導航</button>
-
-<button class="${d.mine?'safe':'mine'}" onclick="toggleMine(${idx})">
+<button onclick="toggle(${idx})">
 ${d.mine?"轉友善":"設雷區"}
 </button>
 
-<button class="delete" onclick="remove(${idx})">刪除</button>
+<button onclick="del(${idx})">
+刪除
+</button>
 
 </div>
 
@@ -304,6 +337,48 @@ ${d.mine?"轉友善":"設雷區"}
 document.getElementById("list").innerHTML=html;
 
 }
+
+function toggle(i){
+
+data[i].mine=!data[i].mine;
+
+save();
+
+render();
+
+}
+
+function del(i){
+
+data.splice(i,1);
+
+save();
+
+render();
+
+}
+
+function voice(){
+
+const rec=new(window.SpeechRecognition||window.webkitSpeechRecognition)();
+
+rec.lang="zh-TW";
+
+rec.start();
+
+rec.onresult=function(e){
+
+let text=e.results[0][0].transcript;
+
+document.getElementById("search").value=text;
+
+suggest();
+
+};
+
+}
+
+render();
 
 </script>
 
